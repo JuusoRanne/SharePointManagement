@@ -1,0 +1,44 @@
+#requires PnPOnline-module 
+#List SharePoint urls seperated with "|"
+#Calls parent link and sublink by the link name and uses ID after that to change url value.
+param(
+    [Parameter(Mandatory = $true, ValueFromPipeline=$true)][string]$Site,
+    [Parameter(Mandatory = $false, ValueFromPipeline=$true)][bool]$AskCredentials
+)
+
+$sites = $Site.split('|')
+    foreach ($s in $sites) {
+    if ($s -NotLike 'https://*')
+        {
+            throw "Entered site url '$s' have to be absolute url"
+        }
+        Write-Output "Connecting to site $s"
+        if($AskCredentials)
+        {
+            Connect-PnPOnline -Url $s -ClearTokenCache -SPOManagementShell -ErrorAction Stop
+        }
+        {
+
+# Stores URL in to variable that can be later used for dynamic url based on name of SharePoint site, comment this off incase you don't have need for dynamic url.
+$sitesDynamic = Get-PnPSite | Select-Object -Property Url
+
+$node = Get-PnPNavigationNode  | Where-Object Title -CContains "<Parent link name>t" | Select-Object -Property id
+
+$nodeParent = Get-PnPNavigationNode -id $node.Id
+
+$nodeChildren = $nodeParent.Children |  Where-Object Title -CContains "<sublink name>"
+
+# Use $SitesDynamic.Url.Split here, incase you need to replace part of url with SharePoint site name.     
+$nodeChildren.Url = "<link here>($sitesDynamic.Url.Split("/")[-1])<link here>"
+$nodeChildren.Update()
+$nodeChildren.Context.ExecuteQuery()
+
+  Write-Output "Site processed"
+  Write-Output ""
+}
+}
+
+
+ Write-Output ("Links processed for " + $sites.Count + " sites.")
+
+        
